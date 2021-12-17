@@ -1,0 +1,117 @@
+# 蓝鲸实验室内部出品
+# 飞书机器人推送提醒
+
+popup my_feishu{
+	item("&提醒测试",{send_test()});
+	separator();
+	item("&设置地址",{dialog_test()});
+}
+ # 菜单函数，
+menubar("飞书上线提醒", "my_feishu");
+
+sub show {
+	show_message("您设置的webhook地址是:".$3["webhook"]);
+	$webhook = $3["webhook"];
+	println("您设置的webhook地址是:".$3["webhook"]);# 这里show函数接收到了dialog传递过来的参数
+
+}
+# 对话框
+sub dialog_test {
+	$info = dialog("修改飞书机器人推送配置",%(webhook => ""),&show); #第一个是菜单的名字，第二个是我们下面定义的菜单显示内容的默认值，第三个参数是我们回调函数，触发show函数的时候显示，并将我们的输入值传递给他
+	drow_text($info,"webhook","飞书机器人Webhook:"); # 设置一个webhook地址
+	dbutton_action($info,"确定"); # 点击按钮，触发回调函数
+	dialog_show($info); # 显示文本输入框
+}
+# 发送post请求，  不会看不懂直接抄的
+sub http_post {
+	# 参考
+	# https://forum.90sec.com/t/topic/1620
+	# https://www.cnblogs.com/aeolian/p/7746158.html
+	# https://blog.csdn.net/qq_27870421/article/details/90110773
+	# 官方调用对象，用起来真恶心
+	# 对象表达式包含在方括号内。对象表达式的第一个参数是目标。第二个是信息
+	# http://sleep.dashnine.org/manual/hoes.html 
+	
+	local('$output');
+	$url = [new java.net.URL: $1];
+	# 创建URLConnection实例，用于设置请求参数
+	$conn = [$url openConnection];
+	# 设置请求体
+	# 设置请求为post
+	[$conn setRequestMethod: "POST"];
+	# 有请求体，需要将setDoOutput的参数设为true, 默认false
+	[$conn setDoOutput: true];
+	# 设置请求头长度，让服务器知道接受多少字节
+	[$conn setRequestProperty: "Content-Length", strlen($2)];
+	# 设置类型为json
+	[$conn setRequestProperty: "Content-Type", "application/json"];
+	# 响应写入到此连接的输出流
+	$outStream = [$conn getOutputStream];
+	# 写入请求体
+	[$outStream write: [$2 getBytes]];
+	# sleep 可以将一个任意的InputStream或OutputStream融合到一个I/O句柄中。
+	# http://sleep.dashnine.org/manual/io.html#3
+	$inStream = [$conn getInputStream];
+	$handle = [SleepUtils getIOHandle: $inStream, $outStream];
+	@content = readAll($handle);
+	return @content;
+}
+
+# 推送文本消息
+sub send_text {
+	$url = $webhook;
+	# println($url);
+	#$json = "{\"msg_type\":\"text\",\"content\":{\"text\": \" $+ $text $+ \" }}";
+	$json = "{\"msg_type\": \"post\",\"content\": {\"post\": {\"zh-CN\": {\"title\": \"New host online reminder!\",\"content\": [[{\"tag\": \"text\",\"text\": \" $+ $1 $+ \"},{\"tag\": \"a\",\"text\": \"\",\"href\": \"\"}]]}}}}";
+	#println($json);
+	$result = http_post($url, $json);
+	#println($result);
+}
+
+sub send_test {
+	$text1 = "";
+	$text1 = $text1."\\r\\nExtranet IP:\\t1.1.1.1";
+	$text1 = $text1."\\r\\nLocal IP:\\t1.1.1.1";
+	$text1 = $text1."\\r\\nUsername:\\tadmin";
+	$text1 = $text1."\\r\\nComputer Name:\\tadmin";
+	send_text($text1);
+
+}
+
+# 有新的 beacons 会触发
+on beacon_initial {
+	
+	# true 代表没有重复的目标
+	$is_repeat = true;
+	# 循环对比所有已有beacon  有没有重复的目标
+	foreach $beacon (beacons()) {
+		# 不检查自己
+		if ($beacon['id'] == beacon_info($1, "id")) {continue;}
+		
+		# 对比已上线的里面有没有外网IP一样的
+		if ($beacon['external'] eq beacon_info($1, "external")) {
+			# 对比内网IP
+			if ($beacon['internal'] eq beacon_info($1, "internal")) {
+				# 对比计算机用户名
+				if ($beacon['user'] eq beacon_info($1, "user")) {
+					# 如果内外网IP、用户名有全一样的，赋值true并结束循环
+					$is_repeat = false;
+					break;
+				}
+			}
+		}
+	}
+
+	# 如果没有重复目标就推送
+	if ($is_repeat){
+		show_message("你有新的主机上线！\n会话ID为：$1 \nOS为：".beacon_info($1,"os")."\n内网地址为:".beacon_info($1,"internal"));
+		# 推送消息的文本
+		$text = "";
+		$text = $text."\\r\\nExtranet IP:\\t".beacon_info($1, 'external');
+		$text = $text."\\r\\nLocal IP:\\t".beacon_info($1, 'internal');
+		$text = $text."\\r\\nUser Name:\\t".beacon_info($1, 'user');
+		$text = $text."\\r\\nComputer Name:\\t".beacon_info($1, 'computer');
+		send_text($text);
+	}
+
+}
