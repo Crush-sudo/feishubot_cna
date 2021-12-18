@@ -22,13 +22,8 @@ sub dialog_test {
 	dbutton_action($info,"确定"); # 点击按钮，触发回调函数
 	dialog_show($info); # 显示文本输入框
 }
-# 发送post请求，  不会看不懂直接抄的
+# 发送post请求
 sub http_post {
-	# 参考
-	# https://forum.90sec.com/t/topic/1620
-	# https://www.cnblogs.com/aeolian/p/7746158.html
-	# https://blog.csdn.net/qq_27870421/article/details/90110773
-	# 官方调用对象，用起来真恶心
 	# 对象表达式包含在方括号内。对象表达式的第一个参数是目标。第二个是信息
 	# http://sleep.dashnine.org/manual/hoes.html 
 	
