@@ -22,7 +22,7 @@ popup my_feishu{
 	separator();
 	item("&设置地址",{dialog_test()});
 }
- # 菜单函数，
+ # 菜单函数
 menubar("飞书上线提醒", "my_feishu");
 
 sub show {
